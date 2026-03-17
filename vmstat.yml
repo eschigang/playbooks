@@ -1,0 +1,42 @@
+---
+- name: Gather vmstat information from all hosts
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Run vmstat command
+      ansible.builtin.command: vmstat -s
+      register: vmstat_output
+
+    - name: Run vmstat with delay (2 samples)
+      ansible.builtin.command: vmstat 1 3
+      register: vmstat_detailed
+
+    - name: Display vmstat summary
+      ansible.builtin.debug:
+        msg: |
+          ========== {{ inventory_hostname }} ({{ ansible_host }}) ==========
+          {{ vmstat_output.stdout }}
+
+    - name: Display vmstat detailed
+      ansible.builtin.debug:
+        msg: |
+          ========== {{ inventory_hostname }} detailed ==========
+          {{ vmstat_detailed.stdout }}
+
+    - name: Save vmstat output to file on remote host
+      ansible.builtin.copy:
+        content: |
+          === vmstat summary ===
+          {{ vmstat_output.stdout }}
+
+          === vmstat detailed (3 samples) ===
+          {{ vmstat_detailed.stdout }}
+        dest: /tmp/vmstat_report_{{ inventory_hostname }}.txt
+        mode: '0644'
+
+    - name: Fetch report from remote host to AWX
+      ansible.builtin.fetch:
+        src: /tmp/vmstat_report_{{ inventory_hostname }}.txt
+        dest: /tmp/vmstat_reports/
+        flat: false
